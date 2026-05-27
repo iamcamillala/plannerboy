@@ -1,14 +1,17 @@
 from flask import Flask, request
 import requests
 import os
+import json
 from datetime import datetime, timedelta
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 TOKEN = os.environ.get("BOT_TOKEN")
+PRIVATE_CALENDAR_ID = os.environ.get("PRIVATE_CALENDAR_ID")
 
 app = Flask(__name__)
 
 user_state = {}
-plans = []
 
 MAIN_MENU = [
     ["➕ Add plan"],
@@ -61,6 +64,19 @@ def send_message(chat_id, text, keyboard=None):
 
     requests.post(url, json=payload)
 
+def get_calendar_service():
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+    creds_dict = json.loads(creds_json)
+
+    scopes = ["https://www.googleapis.com/auth/calendar"]
+
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=scopes
+    )
+
+    return build("calendar", "v3", credentials=creds)
+
 def get_plan_date(timeframe):
     today = datetime.now()
 
@@ -71,12 +87,46 @@ def get_plan_date(timeframe):
         return (today + timedelta(days=1)).strftime("%Y-%m-%d")
 
     if timeframe == "📆 This week":
-        return "This week"
+        return today.strftime("%Y-%m-%d")
 
     if timeframe == "💫 Next week":
-        return "Next week"
+        return (today + timedelta(days=7)).strftime("%Y-%m-%d")
 
-    return "No date"
+    return today.strftime("%Y-%m-%d")
+
+def create_calendar_event(plan):
+    service = get_calendar_service()
+
+    title = f"{plan['category']} {plan['task']}"
+
+    if plan["time"] == "No exact time":
+        event = {
+            "summary": title,
+            "description": "Created by Planner Boy ✨",
+            "start": {"date": plan["date"]},
+            "end": {"date": plan["date"]}
+        }
+    else:
+        start_time = f"{plan['date']}T{plan['time']}:00"
+        end_dt = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S") + timedelta(hours=1)
+
+        event = {
+            "summary": title,
+            "description": "Created by Planner Boy ✨",
+            "start": {
+                "dateTime": start_time,
+                "timeZone": "Asia/Seoul"
+            },
+            "end": {
+                "dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+                "timeZone": "Asia/Seoul"
+            }
+        }
+
+    service.events().insert(
+        calendarId=PRIVATE_CALENDAR_ID,
+        body=event
+    ).execute()
 
 @app.route("/")
 def home():
@@ -136,27 +186,25 @@ def webhook():
             "task": text
         }
 
-        plans.append(plan)
-        user_state[chat_id] = {}
+        try:
+            create_calendar_event(plan)
+            user_state[chat_id] = {}
 
-        send_message(
-            chat_id,
-            f"✨ QUEST SAVED ✨\n\n{plan['category']}\n{plan['date']} • {plan['time']}\n{plan['task']}\n\nYour chaos has been scheduled.",
-            MAIN_MENU
-        )
+            send_message(
+                chat_id,
+                f"✨ QUEST SAVED TO GOOGLE CALENDAR ✨\n\n{plan['category']}\n{plan['date']} • {plan['time']}\n{plan['task']}\n\nYour chaos has been scheduled.",
+                MAIN_MENU
+            )
+
+        except Exception as e:
+            send_message(
+                chat_id,
+                f"Calendar error:\n{type(e).__name__}: {str(e)}",
+                MAIN_MENU
+            )
 
     elif text == "📅 View schedule":
         send_message(chat_id, "Choose schedule:", SCHEDULE_OPTIONS)
-
-    elif text == "📆 All plans":
-        if not plans:
-            send_message(chat_id, "No plans yet. Suspiciously free.", MAIN_MENU)
-        else:
-            result = "📂 ALL PLANS\n\n"
-            for plan in plans:
-                result += f"• {plan['category']} | {plan['date']} • {plan['time']} — {plan['task']}\n"
-
-            send_message(chat_id, result, MAIN_MENU)
 
     elif text == "✨ Today's vibe":
         send_message(
@@ -168,32 +216,6 @@ def webhook():
     elif text == "⬅️ Back":
         user_state[chat_id] = {}
         send_message(chat_id, "Main menu:", MAIN_MENU)
-
-    elif text == "🌤 Today":
-        today = datetime.now().strftime("%Y-%m-%d")
-        today_plans = [p for p in plans if p["date"] == today]
-
-        if not today_plans:
-            send_message(chat_id, "Today is empty. Suspicious, but glamorous.", MAIN_MENU)
-        else:
-            result = "🌤 TODAY\n\n"
-            for plan in today_plans:
-                result += f"• {plan['category']} | {plan['time']} — {plan['task']}\n"
-
-            send_message(chat_id, result, MAIN_MENU)
-
-    elif text == "🌙 Tomorrow":
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        tomorrow_plans = [p for p in plans if p["date"] == tomorrow]
-
-        if not tomorrow_plans:
-            send_message(chat_id, "Tomorrow is empty. Your future self is confused.", MAIN_MENU)
-        else:
-            result = "🌙 TOMORROW\n\n"
-            for plan in tomorrow_plans:
-                result += f"• {plan['category']} | {plan['time']} — {plan['task']}\n"
-
-            send_message(chat_id, result, MAIN_MENU)
 
     else:
         send_message(chat_id, "I didn’t get that. Very mysterious. Use the buttons.", MAIN_MENU)
