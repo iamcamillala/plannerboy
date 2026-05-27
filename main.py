@@ -17,7 +17,7 @@ app = Flask(__name__)
 user_state = {}
 event_map = {}
 
-MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"],  ["🥠 Slay Fortune Cookie"]
+MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"],  ["🥠 Slay Fortune Cookie"] ]
 DAY_OPTIONS = [["🌤 Today", "🌙 Tomorrow"], ["📆 This week", "💫 Next week"], ["⬅️ Back"]]
 HOUR_OPTIONS = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["10", "11", "12"], ["⬅️ Back"]]
 MINUTE_OPTIONS = [["00", "05", "10"], ["15", "20", "25"], ["30", "35", "40"], ["45", "50", "55"], ["⬅️ Back"]]
