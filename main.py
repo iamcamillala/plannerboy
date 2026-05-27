@@ -17,7 +17,7 @@ app = Flask(__name__)
 user_state = {}
 event_map = {}
 
-MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"], ["✨ Today's vibe"]]
+MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"],  ["🥠 Slay Fortune Cookie"]
 DAY_OPTIONS = [["🌤 Today", "🌙 Tomorrow"], ["📆 This week", "💫 Next week"], ["⬅️ Back"]]
 HOUR_OPTIONS = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["10", "11", "12"], ["⬅️ Back"]]
 MINUTE_OPTIONS = [["00", "05", "10"], ["15", "20", "25"], ["30", "35", "40"], ["45", "50", "55"], ["⬅️ Back"]]
@@ -36,6 +36,34 @@ CATEGORY_MESSAGES = {
 
 CATEGORIES = list(CATEGORY_MESSAGES.keys())
 
+def get_slay_fortune():
+    try:
+        response = requests.get("https://zenquotes.io/api/random", timeout=5)
+        data = response.json()[0]
+
+        quote = data.get("q", "You are becoming the person you needed.")
+        author = data.get("a", "unknown")
+
+        translations = [
+            "Planner Boy translation: main character behavior detected.",
+            "Planner Boy translation: stop doubting the plot twist.",
+            "Planner Boy translation: annoying but probably true.",
+            "Planner Boy translation: your future self is watching. Act expensive.",
+            "Planner Boy translation: emotional damage, but make it productive.",
+            "Planner Boy translation: this is not chaos. This is lore.",
+        ]
+
+        import random
+        comment = random.choice(translations)
+
+        return f"🥠 SLAY FORTUNE COOKIE\n\n“{quote}”\n— {author}\n\n{comment}"
+
+    except:
+        return (
+            "🥠 SLAY FORTUNE COOKIE\n\n"
+            "The universe is buffering.\n\n"
+            "Planner Boy translation: even destiny needs Wi-Fi sometimes."
+        )
 
 def send_message(chat_id, text, keyboard=None, inline_keyboard=None):
     payload = {"chat_id": chat_id, "text": text}
@@ -459,9 +487,9 @@ def webhook():
     elif text in ["🌤 Today", "🌙 Tomorrow", "📆 This week", "💫 All upcoming chaos"]:
         show_schedule(chat_id, text)
 
-    elif text == "✨ Today's vibe":
-        send_message(chat_id, "SYSTEM STATUS:\n\n☕ caffeinated\n🧠 mentally everywhere\n✨ still iconic", MAIN_MENU)
-
+    elif text == "🥠 Slay Fortune Cookie":
+    send_message(chat_id, get_slay_fortune(), MAIN_MENU)
+   
     elif text == "⬅️ Back":
         user_state[chat_id] = {}
         send_message(chat_id, "Main menu:", MAIN_MENU)
