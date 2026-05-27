@@ -17,58 +17,14 @@ app = Flask(__name__)
 user_state = {}
 event_map = {}
 
-MAIN_MENU = [
-    ["➕ Add plan"],
-    ["📅 View schedule"],
-    ["✨ Today's vibe"]
-]
-
-DAY_OPTIONS = [
-    ["🌤 Today", "🌙 Tomorrow"],
-    ["📆 This week", "💫 Next week"],
-    ["⬅️ Back"]
-]
-
-HOUR_OPTIONS = [
-    ["1", "2", "3"],
-    ["4", "5", "6"],
-    ["7", "8", "9"],
-    ["10", "11", "12"],
-    ["⬅️ Back"]
-]
-
-MINUTE_OPTIONS = [
-    ["00", "05", "10"],
-    ["15", "20", "25"],
-    ["30", "35", "40"],
-    ["45", "50", "55"],
-    ["⬅️ Back"]
-]
-
-AMPM_OPTIONS = [
-    ["AM", "PM"],
-    ["⬅️ Back"]
-]
-
-DURATION_OPTIONS = [
-    ["30 min", "1 hour"],
-    ["1.5 hours", "2 hours"],
-    ["3 hours", "✏️ Custom duration"],
-    ["⬅️ Back"]
-]
-
-CATEGORY_OPTIONS = [
-    ["💼 Agency", "📈 Business"],
-    ["✨ Creative", "🎀 Fun / Hobby"],
-    ["🧠 Adulting"],
-    ["⬅️ Back"]
-]
-
-VIEW_OPTIONS = [
-    ["🌤 Today", "🌙 Tomorrow"],
-    ["📆 This week", "💫 All upcoming chaos"],
-    ["⬅️ Back"]
-]
+MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"], ["✨ Today's vibe"]]
+DAY_OPTIONS = [["🌤 Today", "🌙 Tomorrow"], ["📆 This week", "💫 Next week"], ["⬅️ Back"]]
+HOUR_OPTIONS = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["10", "11", "12"], ["⬅️ Back"]]
+MINUTE_OPTIONS = [["00", "05", "10"], ["15", "20", "25"], ["30", "35", "40"], ["45", "50", "55"], ["⬅️ Back"]]
+AMPM_OPTIONS = [["AM", "PM"], ["⬅️ Back"]]
+DURATION_OPTIONS = [["30 min", "1 hour"], ["1.5 hours", "2 hours"], ["3 hours", "✏️ Custom duration"], ["⬅️ Back"]]
+CATEGORY_OPTIONS = [["💼 Agency", "📈 Business"], ["✨ Creative", "🎀 Fun / Hobby"], ["🧠 Adulting"], ["⬅️ Back"]]
+VIEW_OPTIONS = [["🌤 Today", "🌙 Tomorrow"], ["📆 This week", "💫 All upcoming chaos"], ["⬅️ Back"]]
 
 CATEGORY_MESSAGES = {
     "💼 Agency": "Don’t be late. They’re paying you.",
@@ -85,40 +41,26 @@ def send_message(chat_id, text, keyboard=None, inline_keyboard=None):
     payload = {"chat_id": chat_id, "text": text}
 
     if keyboard:
-        payload["reply_markup"] = {
-            "keyboard": keyboard,
-            "resize_keyboard": True
-        }
+        payload["reply_markup"] = {"keyboard": keyboard, "resize_keyboard": True}
 
     if inline_keyboard:
-        payload["reply_markup"] = {
-            "inline_keyboard": inline_keyboard
-        }
+        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
 
-    requests.post(
-        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-        json=payload
-    )
+    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json=payload)
 
 
 def answer_callback(callback_id, text="Done ✨"):
     requests.post(
         f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery",
-        json={
-            "callback_query_id": callback_id,
-            "text": text
-        }
+        json={"callback_query_id": callback_id, "text": text}
     )
 
 
 def calendar():
-    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
-
     creds = Credentials.from_service_account_info(
-        json.loads(creds_json),
+        json.loads(os.environ.get("GOOGLE_CREDENTIALS")),
         scopes=["https://www.googleapis.com/auth/calendar"]
     )
-
     return build("calendar", "v3", credentials=creds)
 
 
@@ -157,13 +99,10 @@ def day_to_date(day):
 
     if day == "🌤 Today":
         return now.date()
-
     if day == "🌙 Tomorrow":
         return (now + timedelta(days=1)).date()
-
     if day == "📆 This week":
         return now.date()
-
     if day == "💫 Next week":
         return (now + timedelta(days=7)).date()
 
@@ -176,20 +115,12 @@ def build_start_datetime(state):
 
     if state["ampm"] == "PM" and hour != 12:
         hour += 12
-
     if state["ampm"] == "AM" and hour == 12:
         hour = 0
 
     d = day_to_date(state["day"])
 
-    return datetime(
-        d.year,
-        d.month,
-        d.day,
-        hour,
-        minute,
-        tzinfo=TZ
-    )
+    return datetime(d.year, d.month, d.day, hour, minute, tzinfo=TZ)
 
 
 def create_event(state, task):
@@ -199,25 +130,12 @@ def create_event(state, task):
     event = {
         "summary": f"{state['category']} {task}",
         "description": "Created by Planner Boy ✨",
-        "start": {
-            "dateTime": start.isoformat(),
-            "timeZone": "Asia/Seoul"
-        },
-        "end": {
-            "dateTime": end.isoformat(),
-            "timeZone": "Asia/Seoul"
-        },
-        "extendedProperties": {
-            "private": {
-                "completed": "false"
-            }
-        }
+        "start": {"dateTime": start.isoformat(), "timeZone": "Asia/Seoul"},
+        "end": {"dateTime": end.isoformat(), "timeZone": "Asia/Seoul"},
+        "extendedProperties": {"private": {"completed": "false"}}
     }
 
-    calendar().events().insert(
-        calendarId=CALENDAR_ID,
-        body=event
-    ).execute()
+    calendar().events().insert(calendarId=CALENDAR_ID, body=event).execute()
 
 
 def get_range(period):
@@ -228,12 +146,7 @@ def get_range(period):
         end = start + timedelta(days=1)
 
     elif period == "🌙 Tomorrow":
-        start = (now + timedelta(days=1)).replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+        start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=1)
 
     elif period == "📆 This week":
@@ -262,21 +175,14 @@ def get_events(period):
 
 
 def is_completed(event):
-    return (
-        event.get("extendedProperties", {})
-        .get("private", {})
-        .get("completed") == "true"
-    )
+    return event.get("extendedProperties", {}).get("private", {}).get("completed") == "true"
 
 
 def event_time(event):
-    start = event["start"].get(
-        "dateTime",
-        event["start"].get("date")
-    )
+    start = event["start"].get("dateTime", event["start"].get("date"))
 
     try:
-        dt = datetime.fromisoformat(start)
+        dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
         return dt.strftime("%b %d • %H:%M")
     except:
         return start
@@ -290,10 +196,6 @@ def remove_category(title):
     return title, "✨ Creative"
 
 
-def short(text, length=22):
-    return text if len(text) <= length else text[:length] + "..."
-
-
 def make_short_event_id(event_id):
     short_id = str(uuid.uuid4())[:8]
     event_map[short_id] = event_id
@@ -305,193 +207,87 @@ def show_schedule(chat_id, period):
         events = get_events(period)
 
         if not events:
-            send_message(
-                chat_id,
-                "No chaos scheduled yet.",
-                MAIN_MENU
-            )
+            send_message(chat_id, "No chaos scheduled yet.", MAIN_MENU)
             return
 
         todo = []
         done = []
-        buttons = []
+        done_buttons = []
+        task_buttons = []
         task_number = 1
 
         for event in events:
             title = event.get("summary", "Unnamed quest")
             time = event_time(event)
             event_id = event["id"]
+            sid = make_short_event_id(event_id)
 
             if is_completed(event):
-                done.append(
-                    f"☑ {time}\n{title}"
-                )
+                done.append(f"{task_number}. ☑ {time}\n{title}")
             else:
-                todo.append(
-                    f"{task_number}. ☐ {time}\n{title}"
-                )
+                todo.append(f"{task_number}. ☐ {time}\n{title}")
+                done_buttons.append({"text": f"✅ {task_number}", "callback_data": f"done|{sid}"})
+                task_buttons.append({"text": f"⚙️ {task_number}", "callback_data": f"menu|{sid}"})
 
-                sid = make_short_event_id(event_id)
-
-                buttons.append([
-                    {
-                        "text": f"☑ {task_number}",
-                        "callback_data": f"done|{sid}"
-                    },
-                    {
-                        "text": f"✏️ {task_number}",
-                        "callback_data": f"edit|{sid}"
-                    },
-                    {
-                        "text": f"🗑 {task_number}",
-                        "callback_data": f"del|{sid}"
-                    }
-                ])
-
-                task_number += 1
+            task_number += 1
 
         msg = f"{period}\n\n"
 
         if todo:
-            msg += "TO DO:\n"
-            msg += "\n\n".join(todo)
-            msg += "\n\n"
+            msg += "TO DO:\n\n" + "\n\n".join(todo) + "\n\n"
 
         if done:
-            msg += "DONE:\n"
-            msg += "\n\n".join(done)
-            msg += "\n\n"
+            msg += "DONE:\n\n" + "\n\n".join(done) + "\n\n"
 
         msg += "Your chaos is being documented."
 
-        send_message(
-            chat_id,
-            msg,
-            inline_keyboard=buttons if buttons else None
-        )
+        keyboard = []
+        if done_buttons:
+            keyboard.append(done_buttons)
+        if task_buttons:
+            keyboard.append(task_buttons)
+
+        send_message(chat_id, msg, inline_keyboard=keyboard if keyboard else None)
 
     except Exception as e:
-        send_message(
-            chat_id,
-            f"Schedule error:\n{type(e).__name__}: {e}",
-            MAIN_MENU
-        )
+        send_message(chat_id, f"Schedule error:\n{type(e).__name__}: {e}", MAIN_MENU)
 
 
 def mark_done(event_id):
     calendar().events().patch(
         calendarId=CALENDAR_ID,
         eventId=event_id,
-        body={
-            "extendedProperties": {
-                "private": {
-                    "completed": "true"
-                }
-            }
-        }
+        body={"extendedProperties": {"private": {"completed": "true"}}}
     ).execute()
 
 
 def delete_event(event_id):
-    calendar().events().delete(
-        calendarId=CALENDAR_ID,
-        eventId=event_id
-    ).execute()
+    calendar().events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
 
 
 def get_event(event_id):
-    return calendar().events().get(
-        calendarId=CALENDAR_ID,
-        eventId=event_id
-    ).execute()
+    return calendar().events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
 
 
 def update_event(event_id, event):
-    calendar().events().update(
-        calendarId=CALENDAR_ID,
-        eventId=event_id,
-        body=event
-    ).execute()
+    calendar().events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event).execute()
 
 
 def update_event_name(event_id, new_name):
     event = get_event(event_id)
     old_title = event.get("summary", "")
     _, category = remove_category(old_title)
-
     event["summary"] = f"{category} {new_name}"
-
-    update_event(event_id, event)
-
-
-def update_event_category(event_id, new_category):
-    event = get_event(event_id)
-    old_title = event.get("summary", "")
-    task_name, _ = remove_category(old_title)
-
-    event["summary"] = f"{new_category} {task_name}"
-
-    update_event(event_id, event)
-
-
-def update_event_time(event_id, state):
-    event = get_event(event_id)
-
-    old_start = event["start"].get("dateTime")
-
-    if old_start:
-        old_date = datetime.fromisoformat(old_start).date()
-    else:
-        old_date = datetime.now(TZ).date()
-
-    hour = int(state["hour"])
-    minute = int(state["minute"])
-
-    if state["ampm"] == "PM" and hour != 12:
-        hour += 12
-
-    if state["ampm"] == "AM" and hour == 12:
-        hour = 0
-
-    new_start = datetime(
-        old_date.year,
-        old_date.month,
-        old_date.day,
-        hour,
-        minute,
-        tzinfo=TZ
-    )
-
-    new_end = new_start + timedelta(minutes=state.get("duration", 60))
-
-    event["start"] = {
-        "dateTime": new_start.isoformat(),
-        "timeZone": "Asia/Seoul"
-    }
-
-    event["end"] = {
-        "dateTime": new_end.isoformat(),
-        "timeZone": "Asia/Seoul"
-    }
-
     update_event(event_id, event)
 
 
 def update_event_date_time(event_id, state):
     event = get_event(event_id)
-
     new_start = build_start_datetime(state)
     new_end = new_start + timedelta(minutes=state.get("duration", 60))
 
-    event["start"] = {
-        "dateTime": new_start.isoformat(),
-        "timeZone": "Asia/Seoul"
-    }
-
-    event["end"] = {
-        "dateTime": new_end.isoformat(),
-        "timeZone": "Asia/Seoul"
-    }
+    event["start"] = {"dateTime": new_start.isoformat(), "timeZone": "Asia/Seoul"}
+    event["end"] = {"dateTime": new_end.isoformat(), "timeZone": "Asia/Seoul"}
 
     update_event(event_id, event)
 
@@ -514,99 +310,46 @@ def webhook():
         event_id = event_map.get(sid)
 
         if not event_id:
-            answer_callback(callback_id, "Please open schedule again.")
-            send_message(
-                chat_id,
-                "This button expired. Open schedule again.",
-                MAIN_MENU
-            )
+            answer_callback(callback_id, "Open schedule again.")
+            send_message(chat_id, "This button expired. Open schedule again.", MAIN_MENU)
             return "ok"
 
         try:
             if action == "done":
                 mark_done(event_id)
                 answer_callback(callback_id, "Task completed. Iconic.")
-                send_message(
-                    chat_id,
-                    "☑ Done.\n\nProductive behavior detected.",
-                    MAIN_MENU
-                )
+                send_message(chat_id, "☑ Done.\n\nProductive behavior detected.", MAIN_MENU)
 
             elif action == "del":
                 delete_event(event_id)
                 answer_callback(callback_id, "Deleted.")
+                send_message(chat_id, "🗑 Deleted.\n\nChaos removed from the timeline.", MAIN_MENU)
+
+            elif action == "menu":
+                answer_callback(callback_id, "Task menu")
                 send_message(
                     chat_id,
-                    "🗑 Deleted.\n\nChaos removed from the timeline.",
-                    MAIN_MENU
-                )
-
-            elif action == "edit":
-                user_state[chat_id] = {
-                    "mode": "edit_choose",
-                    "event_id": event_id
-                }
-
-                answer_callback(callback_id, "Edit mode")
-
-                send_message(
-                    chat_id,
-                    "What do you want to edit?",
+                    "Task actions:",
                     inline_keyboard=[
-                        [
-                            {
-                                "text": "📝 Name",
-                                "callback_data": f"editname|{sid}"
-                            }
-                        ],
-                        [
-                            {
-                                "text": "🗓 Date + time + duration",
-                                "callback_data": f"editdatetime|{sid}"
-                            }
-                        ],
-                        [
-                            {
-                                "text": "🎀 Category",
-                                "callback_data": f"editcat|{sid}"
-                            }
-                        ]
+                        [{"text": "✅ Done", "callback_data": f"done|{sid}"}],
+                        [{"text": "✏️ Edit name", "callback_data": f"editname|{sid}"}],
+                        [{"text": "🕒 Edit date/time/duration", "callback_data": f"editdatetime|{sid}"}],
+                        [{"text": "🗑 Delete", "callback_data": f"del|{sid}"}]
                     ]
                 )
 
             elif action == "editname":
-                user_state[chat_id] = {
-                    "mode": "edit_name",
-                    "event_id": event_id
-                }
-
+                user_state[chat_id] = {"mode": "edit_name", "event_id": event_id}
                 answer_callback(callback_id, "Name edit")
                 send_message(chat_id, "Type the new task name:")
 
             elif action == "editdatetime":
-                user_state[chat_id] = {
-                    "mode": "edit_day",
-                    "event_id": event_id
-                }
-
+                user_state[chat_id] = {"mode": "edit_day", "event_id": event_id}
                 answer_callback(callback_id, "Date/time edit")
                 send_message(chat_id, "Choose new day:", DAY_OPTIONS)
 
-            elif action == "editcat":
-                user_state[chat_id] = {
-                    "mode": "edit_category",
-                    "event_id": event_id
-                }
-
-                answer_callback(callback_id, "Category edit")
-                send_message(chat_id, "Choose new life mode:", CATEGORY_OPTIONS)
-
         except Exception as e:
-            send_message(
-                chat_id,
-                f"Action error:\n{type(e).__name__}: {e}",
-                MAIN_MENU
-            )
+            send_message(chat_id, f"Action error:\n{type(e).__name__}: {e}", MAIN_MENU)
 
         return "ok"
 
@@ -619,18 +362,10 @@ def webhook():
 
     if text == "/start":
         user_state[chat_id] = {}
-
-        send_message(
-            chat_id,
-            "✨ Planner Boy ✨\n\nFine. Let’s pretend we have our life together.",
-            MAIN_MENU
-        )
+        send_message(chat_id, "✨ Planner Boy ✨\n\nFine. Let’s pretend we have our life together.", MAIN_MENU)
 
     elif text == "➕ Add plan":
-        user_state[chat_id] = {
-            "mode": "day"
-        }
-
+        user_state[chat_id] = {"mode": "day"}
         send_message(chat_id, "Choose day:", DAY_OPTIONS)
 
     elif text in DAY_OPTIONS[0] + DAY_OPTIONS[1] and state.get("mode") in ["day", "edit_day"]:
@@ -675,45 +410,24 @@ def webhook():
 
     elif state.get("mode") in ["duration", "edit_duration"]:
         if text == "✏️ Custom duration":
-            send_message(
-                chat_id,
-                "Type duration like:\n2 30\n90\n2h 30m"
-            )
+            send_message(chat_id, "Type duration like:\n2 30\n90\n2h 30m")
             return "ok"
 
         duration = parse_duration(text)
 
         if not duration:
-            send_message(
-                chat_id,
-                "I didn’t understand duration. Try: 2 30 or 90."
-            )
+            send_message(chat_id, "I didn’t understand duration. Try: 2 30 or 90.")
             return "ok"
 
         user_state[chat_id]["duration"] = duration
 
         if state.get("mode") == "edit_duration":
             try:
-                update_event_date_time(
-                    state["event_id"],
-                    user_state[chat_id]
-                )
-
+                update_event_date_time(state["event_id"], user_state[chat_id])
                 user_state[chat_id] = {}
-
-                send_message(
-                    chat_id,
-                    "🗓 Edited.\n\nThe timeline has been corrected.",
-                    MAIN_MENU
-                )
-
+                send_message(chat_id, "🗓 Edited.\n\nThe timeline has been corrected.", MAIN_MENU)
             except Exception as e:
-                send_message(
-                    chat_id,
-                    f"Date/time edit error:\n{type(e).__name__}: {e}",
-                    MAIN_MENU
-                )
-
+                send_message(chat_id, f"Date/time edit error:\n{type(e).__name__}: {e}", MAIN_MENU)
         else:
             user_state[chat_id]["mode"] = "category"
             send_message(chat_id, "Choose life mode:", CATEGORY_OPTIONS)
@@ -721,121 +435,46 @@ def webhook():
     elif text in CATEGORY_MESSAGES and state.get("mode") == "category":
         user_state[chat_id]["category"] = text
         user_state[chat_id]["mode"] = "task"
-
-        send_message(
-            chat_id,
-            f"{CATEGORY_MESSAGES[text]}\n\nNow type the task name:"
-        )
-
-    elif text in CATEGORY_MESSAGES and state.get("mode") == "edit_category":
-        try:
-            update_event_category(
-                state["event_id"],
-                text
-            )
-
-            user_state[chat_id] = {}
-
-            send_message(
-                chat_id,
-                "🎀 Category edited.\n\nNew life mode activated.",
-                MAIN_MENU
-            )
-
-        except Exception as e:
-            send_message(
-                chat_id,
-                f"Category edit error:\n{type(e).__name__}: {e}",
-                MAIN_MENU
-            )
+        send_message(chat_id, f"{CATEGORY_MESSAGES[text]}\n\nNow type the task name:")
 
     elif state.get("mode") == "task":
         try:
-            create_event(
-                user_state[chat_id],
-                text
-            )
-
+            create_event(user_state[chat_id], text)
             user_state[chat_id] = {}
-
-            send_message(
-                chat_id,
-                f"✨ QUEST SAVED ✨\n\n{text}\n\nYour chaos has been scheduled.",
-                MAIN_MENU
-            )
-
+            send_message(chat_id, f"✨ QUEST SAVED ✨\n\n{text}\n\nYour chaos has been scheduled.", MAIN_MENU)
         except Exception as e:
-            send_message(
-                chat_id,
-                f"Calendar error:\n{type(e).__name__}: {e}",
-                MAIN_MENU
-            )
+            send_message(chat_id, f"Calendar error:\n{type(e).__name__}: {e}", MAIN_MENU)
 
     elif state.get("mode") == "edit_name":
         try:
-            update_event_name(
-                state["event_id"],
-                text
-            )
-
+            update_event_name(state["event_id"], text)
             user_state[chat_id] = {}
-
-            send_message(
-                chat_id,
-                "✏️ Edited.\n\nThe timeline has been adjusted.",
-                MAIN_MENU
-            )
-
+            send_message(chat_id, "✏️ Edited.\n\nThe timeline has been adjusted.", MAIN_MENU)
         except Exception as e:
-            send_message(
-                chat_id,
-                f"Edit error:\n{type(e).__name__}: {e}",
-                MAIN_MENU
-            )
+            send_message(chat_id, f"Edit error:\n{type(e).__name__}: {e}", MAIN_MENU)
 
     elif text == "📅 View schedule":
-        send_message(
-            chat_id,
-            "Choose schedule:",
-            VIEW_OPTIONS
-        )
+        send_message(chat_id, "Choose schedule:", VIEW_OPTIONS)
 
     elif text in ["🌤 Today", "🌙 Tomorrow", "📆 This week", "💫 All upcoming chaos"]:
         show_schedule(chat_id, text)
 
     elif text == "✨ Today's vibe":
-        send_message(
-            chat_id,
-            "SYSTEM STATUS:\n\n☕ caffeinated\n🧠 mentally everywhere\n✨ still iconic",
-            MAIN_MENU
-        )
+        send_message(chat_id, "SYSTEM STATUS:\n\n☕ caffeinated\n🧠 mentally everywhere\n✨ still iconic", MAIN_MENU)
 
     elif text == "⬅️ Back":
         user_state[chat_id] = {}
-
-        send_message(
-            chat_id,
-            "Main menu:",
-            MAIN_MENU
-        )
+        send_message(chat_id, "Main menu:", MAIN_MENU)
 
     else:
-        send_message(
-            chat_id,
-            "I didn’t get that. Very mysterious. Use the buttons.",
-            MAIN_MENU
-        )
+        send_message(chat_id, "I didn’t get that. Very mysterious. Use the buttons.", MAIN_MENU)
 
     return "ok"
 
 
 @app.route("/set_webhook")
 def set_webhook():
-    url = (
-        f"https://api.telegram.org/bot{TOKEN}"
-        f"/setWebhook?url=https://plannerboy.onrender.com/webhook"
-    )
-
+    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://plannerboy.onrender.com/webhook"
     return requests.get(url).text
 
 
