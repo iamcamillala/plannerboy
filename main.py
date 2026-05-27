@@ -28,11 +28,26 @@ TIME_OPTIONS = [
     ["⬅️ Back"]
 ]
 
+CATEGORY_OPTIONS = [
+    ["💼 Agency", "📈 Business"],
+    ["✨ Creative", "🎀 Fun / Hobby"],
+    ["🧠 Adulting"],
+    ["⬅️ Back"]
+]
+
 SCHEDULE_OPTIONS = [
     ["🌤 Today", "🌙 Tomorrow"],
     ["📆 All plans"],
     ["⬅️ Back"]
 ]
+
+CATEGORY_MESSAGES = {
+    "💼 Agency": "Don’t be late. They’re paying you.",
+    "📈 Business": "Future millionaire behavior.",
+    "✨ Creative": "Time to make something unnecessarily iconic.",
+    "🎀 Fun / Hobby": "You built this life for yourself. Go have fun baby.",
+    "🧠 Adulting": "Adulting is slay baby."
+}
 
 def send_message(chat_id, text, keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -97,9 +112,18 @@ def webhook():
         send_message(chat_id, "Choose time:", TIME_OPTIONS)
 
     elif text in ["09:00", "12:00", "15:00", "18:00", "21:00", "No exact time"] and user_state.get(chat_id, {}).get("mode") == "choose_time":
-        user_state[chat_id]["mode"] = "enter_task"
+        user_state[chat_id]["mode"] = "choose_category"
         user_state[chat_id]["time"] = text
-        send_message(chat_id, "Now type the task name:")
+        send_message(chat_id, "Choose life mode:", CATEGORY_OPTIONS)
+
+    elif text in CATEGORY_MESSAGES and user_state.get(chat_id, {}).get("mode") == "choose_category":
+        user_state[chat_id]["mode"] = "enter_task"
+        user_state[chat_id]["category"] = text
+
+        send_message(
+            chat_id,
+            f"{CATEGORY_MESSAGES[text]}\n\nNow type the task name:"
+        )
 
     elif user_state.get(chat_id, {}).get("mode") == "enter_task":
         state = user_state[chat_id]
@@ -108,6 +132,7 @@ def webhook():
             "date": state["date"],
             "timeframe": state["timeframe"],
             "time": state["time"],
+            "category": state["category"],
             "task": text
         }
 
@@ -116,7 +141,7 @@ def webhook():
 
         send_message(
             chat_id,
-            f"✨ QUEST SAVED ✨\n\n{plan['date']} • {plan['time']}\n{plan['task']}\n\nYour chaos has been scheduled.",
+            f"✨ QUEST SAVED ✨\n\n{plan['category']}\n{plan['date']} • {plan['time']}\n{plan['task']}\n\nYour chaos has been scheduled.",
             MAIN_MENU
         )
 
@@ -129,7 +154,7 @@ def webhook():
         else:
             result = "📂 ALL PLANS\n\n"
             for plan in plans:
-                result += f"• {plan['date']} • {plan['time']} — {plan['task']}\n"
+                result += f"• {plan['category']} | {plan['date']} • {plan['time']} — {plan['task']}\n"
 
             send_message(chat_id, result, MAIN_MENU)
 
@@ -153,7 +178,7 @@ def webhook():
         else:
             result = "🌤 TODAY\n\n"
             for plan in today_plans:
-                result += f"• {plan['time']} — {plan['task']}\n"
+                result += f"• {plan['category']} | {plan['time']} — {plan['task']}\n"
 
             send_message(chat_id, result, MAIN_MENU)
 
@@ -166,7 +191,7 @@ def webhook():
         else:
             result = "🌙 TOMORROW\n\n"
             for plan in tomorrow_plans:
-                result += f"• {plan['time']} — {plan['task']}\n"
+                result += f"• {plan['category']} | {plan['time']} — {plan['task']}\n"
 
             send_message(chat_id, result, MAIN_MENU)
 
