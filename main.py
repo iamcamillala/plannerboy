@@ -54,7 +54,11 @@ CATEGORY_MESSAGES = {
 
 def send_message(chat_id, text, keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
+
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
 
     if keyboard:
         payload["reply_markup"] = {
@@ -66,6 +70,7 @@ def send_message(chat_id, text, keyboard=None):
 
 def get_calendar_service():
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+
     creds_dict = json.loads(creds_json)
 
     scopes = ["https://www.googleapis.com/auth/calendar"]
@@ -100,15 +105,33 @@ def create_calendar_event(plan):
     title = f"{plan['category']} {plan['task']}"
 
     if plan["time"] == "No exact time":
+
+        next_day = (
+            datetime.strptime(plan["date"], "%Y-%m-%d")
+            + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
         event = {
             "summary": title,
             "description": "Created by Planner Boy ✨",
-            "start": {"date": plan["date"]},
-            "end": {"date": plan["date"]}
+            "start": {
+                "date": plan["date"]
+            },
+            "end": {
+                "date": next_day
+            }
         }
+
     else:
         start_time = f"{plan['date']}T{plan['time']}:00"
-        end_dt = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S") + timedelta(hours=1)
+
+        end_dt = (
+            datetime.strptime(
+                start_time,
+                "%Y-%m-%dT%H:%M:%S"
+            )
+            + timedelta(hours=1)
+        )
 
         event = {
             "summary": title,
@@ -128,12 +151,28 @@ def create_calendar_event(plan):
         body=event
     ).execute()
 
+def get_upcoming_events():
+    service = get_calendar_service()
+
+    now = datetime.utcnow().isoformat() + "Z"
+
+    events_result = service.events().list(
+        calendarId=PRIVATE_CALENDAR_ID,
+        timeMin=now,
+        maxResults=20,
+        singleEvents=True,
+        orderBy="startTime"
+    ).execute()
+
+    return events_result.get("items", [])
+
 @app.route("/")
 def home():
     return "Planner Boy is alive ✨"
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+
     data = request.get_json()
 
     if "message" not in data:
@@ -143,6 +182,9 @@ def webhook():
     text = data["message"].get("text", "")
 
     if text == "/start":
+
+        user_state[chat_id] = {}
+
         send_message(
             chat_id,
             "✨ Planner Boy ✨\n\nFine. Let’s pretend we have our life together.",
@@ -150,23 +192,53 @@ def webhook():
         )
 
     elif text == "➕ Add plan":
-        user_state[chat_id] = {"mode": "choose_timeframe"}
-        send_message(chat_id, "Choose timeframe:", TIMEFRAME_OPTIONS)
 
-    elif text in ["🌤 Today", "🌙 Tomorrow", "📆 This week", "💫 Next week"] and user_state.get(chat_id, {}).get("mode") == "choose_timeframe":
+        user_state[chat_id] = {
+            "mode": "choose_timeframe"
+        }
+
+        send_message(
+            chat_id,
+            "Choose timeframe:",
+            TIMEFRAME_OPTIONS
+        )
+
+    elif (
+        text in ["🌤 Today", "🌙 Tomorrow", "📆 This week", "💫 Next week"]
+        and user_state.get(chat_id, {}).get("mode") == "choose_timeframe"
+    ):
+
         user_state[chat_id] = {
             "mode": "choose_time",
             "timeframe": text,
             "date": get_plan_date(text)
         }
-        send_message(chat_id, "Choose time:", TIME_OPTIONS)
 
-    elif text in ["09:00", "12:00", "15:00", "18:00", "21:00", "No exact time"] and user_state.get(chat_id, {}).get("mode") == "choose_time":
+        send_message(
+            chat_id,
+            "Choose time:",
+            TIME_OPTIONS
+        )
+
+    elif (
+        text in ["09:00", "12:00", "15:00", "18:00", "21:00", "No exact time"]
+        and user_state.get(chat_id, {}).get("mode") == "choose_time"
+    ):
+
         user_state[chat_id]["mode"] = "choose_category"
         user_state[chat_id]["time"] = text
-        send_message(chat_id, "Choose life mode:", CATEGORY_OPTIONS)
 
-    elif text in CATEGORY_MESSAGES and user_state.get(chat_id, {}).get("mode") == "choose_category":
+        send_message(
+            chat_id,
+            "Choose life mode:",
+            CATEGORY_OPTIONS
+        )
+
+    elif (
+        text in CATEGORY_MESSAGES
+        and user_state.get(chat_id, {}).get("mode") == "choose_category"
+    ):
+
         user_state[chat_id]["mode"] = "enter_task"
         user_state[chat_id]["category"] = text
 
@@ -176,6 +248,7 @@ def webhook():
         )
 
     elif user_state.get(chat_id, {}).get("mode") == "enter_task":
+
         state = user_state[chat_id]
 
         plan = {
@@ -188,6 +261,7 @@ def webhook():
 
         try:
             create_calendar_event(plan)
+
             user_state[chat_id] = {}
 
             send_message(
@@ -197,6 +271,7 @@ def webhook():
             )
 
         except Exception as e:
+
             send_message(
                 chat_id,
                 f"Calendar error:\n{type(e).__name__}: {str(e)}",
@@ -204,9 +279,62 @@ def webhook():
             )
 
     elif text == "📅 View schedule":
-        send_message(chat_id, "Choose schedule:", SCHEDULE_OPTIONS)
+
+        try:
+            events = get_upcoming_events()
+
+            if not events:
+
+                send_message(
+                    chat_id,
+                    "No chaos scheduled yet.",
+                    MAIN_MENU
+                )
+
+            else:
+
+                message = "📅 YOUR CHAOS:\n\n"
+
+                for event in events:
+
+                    start = event["start"].get(
+                        "dateTime",
+                        event["start"].get("date")
+                    )
+
+                    title = event.get(
+                        "summary",
+                        "Unnamed quest"
+                    )
+
+                    try:
+                        dt = datetime.fromisoformat(
+                            start.replace("Z", "+00:00")
+                        )
+
+                        formatted = dt.strftime("%b %d • %H:%M")
+
+                    except:
+                        formatted = start
+
+                    message += f"• {formatted}\n{title}\n\n"
+
+                send_message(
+                    chat_id,
+                    message,
+                    MAIN_MENU
+                )
+
+        except Exception as e:
+
+            send_message(
+                chat_id,
+                f"Schedule error:\n{type(e).__name__}: {str(e)}",
+                MAIN_MENU
+            )
 
     elif text == "✨ Today's vibe":
+
         send_message(
             chat_id,
             "SYSTEM STATUS:\n\n☕ caffeinated\n🧠 mentally everywhere\n✨ still iconic",
@@ -214,17 +342,38 @@ def webhook():
         )
 
     elif text == "⬅️ Back":
+
         user_state[chat_id] = {}
-        send_message(chat_id, "Main menu:", MAIN_MENU)
+
+        send_message(
+            chat_id,
+            "Main menu:",
+            MAIN_MENU
+        )
 
     else:
-        send_message(chat_id, "I didn’t get that. Very mysterious. Use the buttons.", MAIN_MENU)
+
+        send_message(
+            chat_id,
+            "I didn’t get that. Very mysterious. Use the buttons.",
+            MAIN_MENU
+        )
 
     return "ok"
 
 @app.route("/set_webhook")
 def set_webhook():
+
     webhook_url = "https://plannerboy.onrender.com/webhook"
-    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={webhook_url}"
+
+    url = (
+        f"https://api.telegram.org/bot{TOKEN}"
+        f"/setWebhook?url={webhook_url}"
+    )
+
     response = requests.get(url)
+
     return response.text
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
