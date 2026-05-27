@@ -4,6 +4,7 @@ import os
 import json
 import re
 import uuid
+import random
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from google.oauth2.service_account import Credentials
@@ -17,7 +18,12 @@ app = Flask(__name__)
 user_state = {}
 event_map = {}
 
-MAIN_MENU = [["➕ Add plan"], ["📅 View schedule"],  ["🥠 Slay Fortune Cookie"] ]
+MAIN_MENU = [
+    ["➕ Add plan"],
+    ["📅 View schedule"],
+    ["🥠 Slay Fortune Cookie"]
+]
+
 DAY_OPTIONS = [["🌤 Today", "🌙 Tomorrow"], ["📆 This week", "💫 Next week"], ["⬅️ Back"]]
 HOUR_OPTIONS = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["10", "11", "12"], ["⬅️ Back"]]
 MINUTE_OPTIONS = [["00", "05", "10"], ["15", "20", "25"], ["30", "35", "40"], ["45", "50", "55"], ["⬅️ Back"]]
@@ -36,6 +42,23 @@ CATEGORY_MESSAGES = {
 
 CATEGORIES = list(CATEGORY_MESSAGES.keys())
 
+def send_message(chat_id, text, keyboard=None, inline_keyboard=None):
+    payload = {"chat_id": chat_id, "text": text}
+
+    if keyboard:
+        payload["reply_markup"] = {"keyboard": keyboard, "resize_keyboard": True}
+
+    if inline_keyboard:
+        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
+
+    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json=payload)
+
+def answer_callback(callback_id, text="Done ✨"):
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery",
+        json={"callback_query_id": callback_id, "text": text}
+    )
+
 def get_slay_fortune():
     try:
         response = requests.get("https://zenquotes.io/api/random", timeout=5)
@@ -50,13 +73,10 @@ def get_slay_fortune():
             "Planner Boy translation: annoying but probably true.",
             "Planner Boy translation: your future self is watching. Act expensive.",
             "Planner Boy translation: emotional damage, but make it productive.",
-            "Planner Boy translation: this is not chaos. This is lore.",
+            "Planner Boy translation: this is not chaos. This is lore."
         ]
 
-        import random
-        comment = random.choice(translations)
-
-        return f"🥠 SLAY FORTUNE COOKIE\n\n“{quote}”\n— {author}\n\n{comment}"
+        return f"🥠 SLAY FORTUNE COOKIE\n\n“{quote}”\n— {author}\n\n{random.choice(translations)}"
 
     except:
         return (
@@ -65,25 +85,6 @@ def get_slay_fortune():
             "Planner Boy translation: even destiny needs Wi-Fi sometimes."
         )
 
-def send_message(chat_id, text, keyboard=None, inline_keyboard=None):
-    payload = {"chat_id": chat_id, "text": text}
-
-    if keyboard:
-        payload["reply_markup"] = {"keyboard": keyboard, "resize_keyboard": True}
-
-    if inline_keyboard:
-        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
-
-    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json=payload)
-
-
-def answer_callback(callback_id, text="Done ✨"):
-    requests.post(
-        f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery",
-        json={"callback_query_id": callback_id, "text": text}
-    )
-
-
 def calendar():
     creds = Credentials.from_service_account_info(
         json.loads(os.environ.get("GOOGLE_CREDENTIALS")),
@@ -91,10 +92,8 @@ def calendar():
     )
     return build("calendar", "v3", credentials=creds)
 
-
 def parse_duration(text):
     t = text.lower().strip()
-
     fixed = {
         "30 min": 30,
         "1 hour": 60,
@@ -121,7 +120,6 @@ def parse_duration(text):
 
     return None
 
-
 def day_to_date(day):
     now = datetime.now(TZ)
 
@@ -136,7 +134,6 @@ def day_to_date(day):
 
     return now.date()
 
-
 def build_start_datetime(state):
     hour = int(state["hour"])
     minute = int(state["minute"])
@@ -147,9 +144,7 @@ def build_start_datetime(state):
         hour = 0
 
     d = day_to_date(state["day"])
-
     return datetime(d.year, d.month, d.day, hour, minute, tzinfo=TZ)
-
 
 def create_event(state, task):
     start = build_start_datetime(state)
@@ -164,7 +159,6 @@ def create_event(state, task):
     }
 
     calendar().events().insert(calendarId=CALENDAR_ID, body=event).execute()
-
 
 def get_range(period):
     now = datetime.now(TZ)
@@ -187,7 +181,6 @@ def get_range(period):
 
     return start, end
 
-
 def get_events(period):
     start, end = get_range(period)
 
@@ -201,10 +194,8 @@ def get_events(period):
 
     return result.get("items", [])
 
-
 def is_completed(event):
     return event.get("extendedProperties", {}).get("private", {}).get("completed") == "true"
-
 
 def event_time(event):
     start = event["start"].get("dateTime", event["start"].get("date"))
@@ -215,7 +206,6 @@ def event_time(event):
     except:
         return start
 
-
 def remove_category(title):
     for cat in CATEGORIES:
         if title.startswith(cat):
@@ -223,12 +213,10 @@ def remove_category(title):
 
     return title, "✨ Creative"
 
-
 def make_short_event_id(event_id):
     short_id = str(uuid.uuid4())[:8]
     event_map[short_id] = event_id
     return short_id
-
 
 def show_schedule(chat_id, period):
     try:
@@ -247,8 +235,7 @@ def show_schedule(chat_id, period):
         for event in events:
             title = event.get("summary", "Unnamed quest")
             time = event_time(event)
-            event_id = event["id"]
-            sid = make_short_event_id(event_id)
+            sid = make_short_event_id(event["id"])
 
             if is_completed(event):
                 done.append(f"{task_number}. ☑ {time}\n{title}")
@@ -280,7 +267,6 @@ def show_schedule(chat_id, period):
     except Exception as e:
         send_message(chat_id, f"Schedule error:\n{type(e).__name__}: {e}", MAIN_MENU)
 
-
 def mark_done(event_id):
     calendar().events().patch(
         calendarId=CALENDAR_ID,
@@ -288,18 +274,14 @@ def mark_done(event_id):
         body={"extendedProperties": {"private": {"completed": "true"}}}
     ).execute()
 
-
 def delete_event(event_id):
     calendar().events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
-
 
 def get_event(event_id):
     return calendar().events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
 
-
 def update_event(event_id, event):
     calendar().events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event).execute()
-
 
 def update_event_name(event_id, new_name):
     event = get_event(event_id)
@@ -307,7 +289,6 @@ def update_event_name(event_id, new_name):
     _, category = remove_category(old_title)
     event["summary"] = f"{category} {new_name}"
     update_event(event_id, event)
-
 
 def update_event_date_time(event_id, state):
     event = get_event(event_id)
@@ -319,11 +300,9 @@ def update_event_date_time(event_id, state):
 
     update_event(event_id, event)
 
-
 @app.route("/")
 def home():
     return "Planner Boy is alive ✨"
-
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -431,7 +410,7 @@ def webhook():
 
         if state.get("mode") == "edit_ampm":
             user_state[chat_id]["mode"] = "edit_duration"
-            send_message(chat_id, "New duration?", DURATION_OPTIONS)
+            send_message(chat_id, "How long will it take?", DURATION_OPTIONS)
         else:
             user_state[chat_id]["mode"] = "duration"
             send_message(chat_id, "How long will it take?", DURATION_OPTIONS)
@@ -488,8 +467,8 @@ def webhook():
         show_schedule(chat_id, text)
 
     elif text == "🥠 Slay Fortune Cookie":
-    send_message(chat_id, get_slay_fortune(), MAIN_MENU)
-   
+        send_message(chat_id, get_slay_fortune(), MAIN_MENU)
+
     elif text == "⬅️ Back":
         user_state[chat_id] = {}
         send_message(chat_id, "Main menu:", MAIN_MENU)
@@ -499,12 +478,10 @@ def webhook():
 
     return "ok"
 
-
 @app.route("/set_webhook")
 def set_webhook():
     url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://plannerboy.onrender.com/webhook"
     return requests.get(url).text
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
